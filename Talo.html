@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>John Talo</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #222;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb);
+        scene.fog = new THREE.Fog(0x87ceeb, 50, 150);
+
+        // Camera setup (Orthographic for isometric look)
+        const aspect = window.innerWidth / window.innerHeight;
+        const d = 10;
+        const camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 1000);
+        const cameraOffset = new THREE.Vector3(20, 20, 20);
+        camera.position.copy(cameraOffset);
+
+        // Renderer setup
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+        dirLight.position.set(20, 30, 20);
+        dirLight.castShadow = true;
+        dirLight.shadow.camera.left = -30;
+        dirLight.shadow.camera.right = 30;
+        dirLight.shadow.camera.top = 30;
+        dirLight.shadow.camera.bottom = -30;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.bias = -0.001;
+        scene.add(dirLight);
+        scene.add(dirLight.target);
+
+        // Large Platform (Green)
+        const platformSize = 200;
+        const platformGeo = new THREE.BoxGeometry(platformSize, 1, platformSize);
+        const platformMat = new THREE.MeshStandardMaterial({ color: 0x4a6b3d });
+        const platform = new THREE.Mesh(platformGeo, platformMat);
+        platform.position.y = -0.5;
+        platform.receiveShadow = true;
+        scene.add(platform);
+
+        // Grid helper
+        const gridHelper = new THREE.GridHelper(platformSize, 100, 0x2e3a1a, 0x3a4a22);
+        gridHelper.position.y = 0.01;
+        scene.add(gridHelper);
+
+        // ==========================================
+        // Procedural Texture Generation
+        // ==========================================
+
+        function createJeansTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1C1C1C';
+            ctx.fillRect(0, 0, 128, 128);
+            ctx.strokeStyle = '#121212';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 128; i += 3) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 128); ctx.stroke();
+            }
+            for (let i = 0; i < 400; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? '#2D2D2D' : '#0A0A0A';
+                ctx.fillRect(Math.random() * 128, Math.random() * 128, 1, 1);
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(2, 2);
+            return tex;
+        }
+
+        function createWoolTexture(base = '#4E6885', stroke = '#3D5370', light = '#6A86A3', dark = '#3E566F') {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = base;
+            ctx.fillRect(0, 0, 128, 128);
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth = 2;
+            for (let y = 0; y < 128; y += 8) {
+                for (let x = 0; x < 128; x += 8) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x + 4, y + 6);
+                    ctx.lineTo(x + 8, y);
+                    ctx.stroke();
+                }
+            }
+            for (let i = 0; i < 1000; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? light : dark;
+                ctx.fillRect(Math.random() * 128, Math.random() * 128, 2, 2);
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(2, 2);
+            return tex;
+        }
+
+        function createLeatherTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#121212';
+            ctx.fillRect(0, 0, 128, 128);
+            for (let i = 0; i < 2000; i++) {
+                const shade = Math.random();
+                ctx.fillStyle = shade > 0.8 ? '#242424' : (shade > 0.6 ? '#070707' : '#121212');
+                ctx.beginPath();
+                ctx.arc(Math.random() * 128, Math.random() * 128, Math.random() * 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.strokeStyle = '#242424';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 20; i++) {
+                ctx.beginPath();
+                ctx.moveTo(Math.random() * 128, Math.random() * 128);
+                ctx.lineTo(Math.random() * 128, Math.random() * 128);
+                ctx.stroke();
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(1, 2);
+            return tex;
+        }
+
+        function createFaceTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024;
+            canvas.height = 1024;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.save();
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.scale(0.6, 0.6);
+            ctx.translate(-canvas.width / 2, -canvas.height / 2);
+
+            ctx.fillStyle = '#000000';
+            ctx.strokeStyle = '#000000';
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            ctx.beginPath();
+            ctx.arc(400, 480, 45, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(624, 480, 45, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(400, 700);
+            ctx.lineTo(440, 700);
+            ctx.lineTo(420, 745);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(584, 700);
+            ctx.lineTo(624, 700);
+            ctx.lineTo(604, 745);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.lineWidth = 18;
+            ctx.beginPath();
+            ctx.moveTo(420, 700);
+            ctx.bezierCurveTo(450, 745, 480, 655, 512, 700);
+            ctx.bezierCurveTo(544, 745, 574, 655, 604, 700);
+            ctx.stroke();
+
+            ctx.restore();
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.anisotropy = 16;
+            tex.offset.x = 0.25;
+            
+            return tex;
+        }
+
+        // ==========================================
+        // Chibi Character Construction (John Talo)
+        // ==========================================
+        const character = new THREE.Group();
+        scene.add(character);
+
+        const visual = new THREE.Group();
+        character.add(visual);
+
+        // Materials
+        const skinMat = new THREE.MeshStandardMaterial({
+            color: 0xcfeaf7,
+            roughness: 0.35,
+            emissive: 0x1b4a63,
+            emissiveIntensity: 0.35
+        });
+        const pantsMat = new THREE.MeshStandardMaterial({ map: createJeansTexture(), roughness: 0.9 });
+        const bootsMat = new THREE.MeshStandardMaterial({ map: createLeatherTexture(), roughness: 0.5 });
+        
+        // Burgundy shirt/turtleneck
+        const shirtMat = new THREE.MeshStandardMaterial({ 
+            map: createWoolTexture('#6B2737', '#4A1B26', '#8C3248', '#3A1119'), 
+            roughness: 1.0 
+        });
+
+        // Big white hair material (flat shaded for low-poly look)
+        const hairMat = new THREE.MeshStandardMaterial({ 
+            color: 0xffffff, 
+            roughness: 0.85, 
+            flatShading: true 
+        });
+
+        // LEGS
+        function createLeg(side) {
+            const legGroup = new THREE.Group();
+            legGroup.position.set(0.18 * side, 0.55, 0);
+
+            const leg = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.4, 0.24), pantsMat);
+            leg.position.y = -0.2;
+            leg.castShadow = true;
+            legGroup.add(leg);
+
+            const boot = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.2, 0.38), bootsMat);
+            boot.position.set(0, -0.45, 0.06);
+            boot.castShadow = true;
+            legGroup.add(boot);
+
+            visual.add(legGroup);
+            return legGroup;
+        }
+        const leftLeg = createLeg(-1);
+        const rightLeg = createLeg(1);
+
+        // TORSO
+        const torso = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.65, 0.44), shirtMat);
+        torso.position.y = 1.05;
+        torso.castShadow = true;
+        visual.add(torso);
+
+        // TURTLENECK
+        const turtleneck = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.34, 0.14, 16), shirtMat);
+        turtleneck.position.y = 1.47;
+        turtleneck.castShadow = true;
+        visual.add(turtleneck);
+
+        // --- Zipper ---
+        const tapeMat = new THREE.MeshStandardMaterial({ color: 0x161616, roughness: 0.9 });
+        const teethMat = new THREE.MeshStandardMaterial({ color: 0xb5b5b5, metalness: 0.85, roughness: 0.3 });
+        const sliderMat = new THREE.MeshStandardMaterial({ color: 0xf0f0f0, metalness: 0.9, roughness: 0.2 });
+
+        const zipTop = 1.32;
+        const zipBottom = 0.82;
+        const zipFrontZ = 0.226;
+
+        const tapeLength = zipTop - zipBottom;
+        const tapeCenterY = (zipTop + zipBottom) / 2;
+        for (const side of [-1, 1]) {
+            const tape = new THREE.Mesh(new THREE.BoxGeometry(0.03, tapeLength, 0.008), tapeMat);
+            tape.position.set(0.02 * side, tapeCenterY, zipFrontZ);
+            visual.add(tape);
+        }
+
+        const toothStep = 0.024;
+        const toothCount = Math.floor(tapeLength / toothStep);
+        for (let t = 0; t < toothCount; t++) {
+            const y = zipTop - 0.02 - t * toothStep;
+            for (const side of [-1, 1]) {
+                const offset = side === -1 ? 0 : toothStep / 2;
+                const tooth = new THREE.Mesh(new THREE.BoxGeometry(0.014, 0.016, 0.012), teethMat);
+                tooth.position.set(0.008 * side, y - offset, zipFrontZ + 0.004);
+                visual.add(tooth);
+            }
+        }
+
+        const sliderShape = new THREE.Shape();
+        sliderShape.moveTo(-0.035, 0.07);
+        sliderShape.lineTo(0.035, 0.07);
+        sliderShape.lineTo(0.06, -0.04);
+        sliderShape.quadraticCurveTo(0, -0.1, -0.06, -0.04);
+        sliderShape.closePath();
+
+        const channel = new THREE.Path();
+        channel.moveTo(-0.018, -0.03);
+        channel.lineTo(0.018, -0.03);
+        channel.lineTo(0.018, 0.035);
+        channel.lineTo(-0.018, 0.035);
+        channel.closePath();
+        sliderShape.holes.push(channel);
+
+        const sliderGeo = new THREE.ExtrudeGeometry(sliderShape, {
+            depth: 0.02,
+            bevelEnabled: true,
+            bevelThickness: 0.006,
+            bevelSize: 0.006,
+            bevelSegments: 3,
+            curveSegments: 12
+        });
+        const slider = new THREE.Mesh(sliderGeo, sliderMat);
+        slider.position.set(0, zipTop - 0.03, zipFrontZ);
+        slider.castShadow = true;
+        visual.add(slider);
+
+        const bailY = zipTop + 0.04;
+        const bail = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.006, 8, 16), sliderMat);
+        bail.position.set(0, bailY, zipFrontZ + 0.03);
+        visual.add(bail);
+
+        const tabW = 0.1, tabLen = 0.24, r = 0.025;
+        const x0 = -tabW / 2, y0 = -tabLen, w = tabW, h = tabLen;
+        const tabShape = new THREE.Shape();
+        tabShape.moveTo(x0 + r, y0);
+        tabShape.lineTo(x0 + w - r, y0);
+        tabShape.quadraticCurveTo(x0 + w, y0, x0 + w, y0 + r);
+        tabShape.lineTo(x0 + w, y0 + h - r);
+        tabShape.quadraticCurveTo(x0 + w, y0 + h, x0 + w - r, y0 + h);
+        tabShape.lineTo(x0 + r, y0 + h);
+        tabShape.quadraticCurveTo(x0, y0 + h, x0, y0 + h - r);
+        tabShape.lineTo(x0, y0 + r);
+        tabShape.quadraticCurveTo(x0, y0, x0 + r, y0);
+
+        const tabHole = new THREE.Path();
+        tabHole.absarc(0, -0.035, 0.012, 0, Math.PI * 2, true);
+        tabShape.holes.push(tabHole);
+
+        const tabGeo = new THREE.ExtrudeGeometry(tabShape, {
+            depth: 0.01,
+            bevelEnabled: true,
+            bevelThickness: 0.003,
+            bevelSize: 0.003,
+            bevelSegments: 2,
+            curveSegments: 10
+        });
+        const pullTab = new THREE.Mesh(tabGeo, sliderMat);
+        pullTab.position.set(0, bailY + 0.035, zipFrontZ + 0.03);
+        pullTab.rotation.x = -0.15;
+        pullTab.castShadow = true;
+        visual.add(pullTab);
+
+        // ARMS
+        function createArm(side) {
+            const armGroup = new THREE.Group();
+            armGroup.position.set(0.4 * side, 1.25, 0);
+
+            const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.65, 0.2), shirtMat);
+            sleeve.position.y = -0.32;
+            sleeve.castShadow = true;
+            armGroup.add(sleeve);
+
+            const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.1, 8), shirtMat);
+            cuff.position.y = -0.65;
+            cuff.castShadow = true;
+            armGroup.add(cuff);
+
+            const hand = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.16), skinMat);
+            hand.position.y = -0.75;
+            hand.castShadow = true;
+            armGroup.add(hand);
+
+            visual.add(armGroup);
+            return armGroup;
+        }
+        const leftArm = createArm(-1);
+        const rightArm = createArm(1);
+
+        // HEAD
+        const headGeo = new THREE.SphereGeometry(0.46, 32, 32);
+        
+        const head = new THREE.Mesh(headGeo, skinMat);
+        head.position.y = 1.85;
+        head.castShadow = true;
+        visual.add(head);
+
+        const faceTex = createFaceTexture();
+        const faceMat = new THREE.MeshBasicMaterial({ 
+            map: faceTex, 
+            transparent: true, 
+            depthWrite: false
+        });
+        const faceMesh = new THREE.Mesh(headGeo, faceMat);
+        faceMesh.position.y = 1.85;
+        faceMesh.scale.set(1.01, 1.01, 1.01);
+        visual.add(faceMesh);
+
+        // EARS (Rotated to point diagonally up, not horizontally)
+        function createEar(side) {
+            const shape = new THREE.Shape();
+            shape.moveTo(0, -0.1);
+            shape.quadraticCurveTo(0.13, 0.25, 0.0, 0.9);
+            shape.quadraticCurveTo(-0.07, 0.3, 0, -0.1);
+
+            const geo = new THREE.ExtrudeGeometry(shape, {
+                depth: 0.04,
+                bevelEnabled: true,
+                bevelThickness: 0.015,
+                bevelSize: 0.015,
+                bevelSegments: 2,
+                curveSegments: 16
+            });
+            geo.translate(0, 0, -0.02);
+
+            const ear = new THREE.Mesh(geo, skinMat);
+            ear.position.set(0.38 * side, 1.9, 0);
+            ear.rotation.z = -0.7 * side; // Adjusted angle
+            ear.rotation.x = -0.1;
+            ear.rotation.y = 0.2 * side;
+            ear.scale.set(0.8, 0.8, 1);
+            ear.castShadow = true;
+            visual.add(ear);
+            return ear;
+        }
+        createEar(-1);
+        createEar(1);
+
+        // NOSE
+        const nose = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.35, 8), skinMat);
+        nose.position.set(0, 1.83, 0.5);
+        nose.rotation.x = Math.PI / 2;
+        nose.castShadow = true;
+        visual.add(nose);
+
+        // --- Big White Hair ---
+        const hairGroup = new THREE.Group();
+        hairGroup.position.set(0, 1.85, 0);
+        visual.add(hairGroup);
+
+        // 1. Main back/top volume. Positioned slightly back so it doesn't cover the face.
+        const mainHairGeo = new THREE.SphereGeometry(0.5, 8, 6);
+        const mainHair = new THREE.Mesh(mainHairGeo, hairMat);
+        mainHair.position.set(0, 0.06, -0.08);
+        mainHair.scale.set(1.05, 1.05, 1.1);
+        mainHair.castShadow = true;
+        hairGroup.add(mainHair);
+
+        // 2. Bangs (hanging down from the hairline over the forehead)
+        // We use sharp low-poly cones to create a jagged fringe
+        const bangGeo = new THREE.ConeGeometry(0.12, 0.4, 4);
+        
+        const bang1 = new THREE.Mesh(bangGeo, hairMat);
+        bang1.position.set(-0.25, 0.2, 0.35);
+        bang1.rotation.z = 0.25;
+        bang1.rotation.x = -0.1;
+        bang1.castShadow = true;
+        hairGroup.add(bang1);
+
+        const bang2 = new THREE.Mesh(bangGeo, hairMat);
+        bang2.position.set(0, 0.22, 0.38);
+        bang2.rotation.x = -0.1;
+        bang2.castShadow = true;
+        hairGroup.add(bang2);
+
+        const bang3 = new THREE.Mesh(bangGeo, hairMat);
+        bang3.position.set(0.25, 0.2, 0.35);
+        bang3.rotation.z = -0.25;
+        bang3.rotation.x = -0.1;
+        bang3.castShadow = true;
+        hairGroup.add(bang3);
+
+        // 3. Side locks (framing the cheeks)
+        const sideLockGeo = new THREE.ConeGeometry(0.16, 0.7, 4);
+        
+        const leftLock = new THREE.Mesh(sideLockGeo, hairMat);
+        leftLock.position.set(-0.45, -0.1, 0.1);
+        leftLock.rotation.z = 0.1;
+        leftLock.rotation.x = 0.1;
+        leftLock.castShadow = true;
+        hairGroup.add(leftLock);
+
+        const rightLock = new THREE.Mesh(sideLockGeo, hairMat);
+        rightLock.position.set(0.45, -0.1, 0.1);
+        rightLock.rotation.z = -0.1;
+        rightLock.rotation.x = 0.1;
+        rightLock.castShadow = true;
+        hairGroup.add(rightLock);
+
+        // ==========================================
+        // Input
+        // ==========================================
+        const keys = {
+            KeyW: false, KeyA: false, KeyS: false, KeyD: false,
+            ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false,
+            ShiftLeft: false, ShiftRight: false
+        };
+
+        window.addEventListener('keydown', (e) => {
+            if (keys.hasOwnProperty(e.code)) keys[e.code] = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (keys.hasOwnProperty(e.code)) keys[e.code] = false;
+        });
+
+        function releaseAllKeys() {
+            for (const k in keys) keys[k] = false;
+        }
+        window.addEventListener('blur', releaseAllKeys);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) releaseAllKeys();
+            else clock.getDelta();
+        });
+
+        window.addEventListener('wheel', (e) => {
+            camera.zoom -= e.deltaY * 0.001;
+            camera.zoom = Math.max(0.7, Math.min(3, camera.zoom));
+            camera.updateProjectionMatrix();
+        });
+
+        const forward = new THREE.Vector3(-1, 0, -1).normalize();
+        const right = new THREE.Vector3(1, 0, -1).normalize();
+
+        const walkSpeed = 2.8;
+        const runSpeed = 6.5;
+        const clock = new THREE.Clock();
+
+        // ==========================================
+        // Animation System
+        // ==========================================
+        const pose = {
+            leftArm: 0,
+            rightArm: 0,
+            leftLeg: 0,
+            rightLeg: 0,
+            bodyY: 0,
+            bodyTilt: 0
+        };
+
+        const animator = {
+            list: [],
+            add(fn) { this.list.push(fn); return this; },
+            update(ctx) { for (const fn of this.list) fn(ctx); }
+        };
+
+        function smooth(current, target, rate, dt) {
+            return THREE.MathUtils.lerp(current, target, 1 - Math.exp(-rate * dt));
+        }
+
+        animator.add((ctx) => {
+            const freq = THREE.MathUtils.lerp(9, 14, ctx.runBlend);
+            const amp = THREE.MathUtils.lerp(0.5, 0.9, ctx.runBlend) * ctx.moveBlend;
+            const swing = Math.sin(ctx.phase) * amp;
+
+            pose.leftArm += swing;
+            pose.rightArm -= swing;
+            pose.leftLeg -= swing;
+            pose.rightLeg += swing;
+
+            const bobAmount = THREE.MathUtils.lerp(0.05, 0.1, ctx.runBlend);
+            pose.bodyY += (1 - Math.cos(ctx.phase * 2)) * 0.5 * bobAmount * ctx.moveBlend;
+
+            pose.bodyTilt += THREE.MathUtils.lerp(0.03, 0.15, ctx.runBlend) * ctx.moveBlend;
+        });
+
+        animator.add((ctx) => {
+            const idle = 1 - ctx.moveBlend;
+            pose.leftArm += Math.sin(ctx.time * 1.6) * 0.03 * idle;
+            pose.rightArm -= Math.sin(ctx.time * 1.6) * 0.03 * idle;
+            pose.bodyY += Math.sin(ctx.time * 1.8) * 0.012 * idle;
+        });
+
+        let phase = 0;
+        let moveBlend = 0;
+        let runBlend = 0;
+        let currentRotation = 0;
+
+        function applyPose() {
+            leftArm.rotation.x = pose.leftArm;
+            rightArm.rotation.x = pose.rightArm;
+            leftLeg.rotation.x = pose.leftLeg;
+            rightLeg.rotation.x = pose.rightLeg;
+            visual.position.y = pose.bodyY;
+            visual.rotation.x = pose.bodyTilt;
+        }
+
+        let time = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const dt = Math.min(clock.getDelta(), 0.05);
+            time += dt;
+
+            let moveVector = new THREE.Vector3(0, 0, 0);
+            if (keys.KeyW || keys.ArrowUp) moveVector.add(forward);
+            if (keys.KeyS || keys.ArrowDown) moveVector.sub(forward);
+            if (keys.KeyD || keys.ArrowRight) moveVector.add(right);
+            if (keys.KeyA || keys.ArrowLeft) moveVector.sub(right);
+
+            const wantsToMove = moveVector.length() > 0;
+            const isRunning = keys.ShiftLeft || keys.ShiftRight;
+
+            runBlend = smooth(runBlend, wantsToMove && isRunning ? 1 : 0, 6, dt);
+
+            const oldPos = character.position.clone();
+
+            if (wantsToMove) {
+                moveVector.normalize();
+                const speed = THREE.MathUtils.lerp(walkSpeed, runSpeed, runBlend);
+
+                const nextPos = character.position.clone().addScaledVector(moveVector, speed * dt);
+                const bound = (platformSize / 2) - 0.5;
+                nextPos.x = THREE.MathUtils.clamp(nextPos.x, -bound, bound);
+                nextPos.z = THREE.MathUtils.clamp(nextPos.z, -bound, bound);
+                character.position.copy(nextPos);
+
+                const targetAngle = Math.atan2(moveVector.x, moveVector.z);
+                const diff = Math.atan2(Math.sin(targetAngle - currentRotation), Math.cos(targetAngle - currentRotation));
+                currentRotation += diff * (1 - Math.exp(-14 * dt));
+                character.rotation.y = currentRotation;
+            }
+
+            const movedDistance = character.position.distanceTo(oldPos);
+            const actuallyMoving = dt > 0 && (movedDistance / dt) > 0.3;
+            moveBlend = smooth(moveBlend, actuallyMoving ? 1 : 0, 8, dt);
+
+            if (moveBlend > 0.001) {
+                phase += dt * THREE.MathUtils.lerp(9, 14, runBlend) * moveBlend;
+            }
+
+            pose.leftArm = 0;
+            pose.rightArm = 0;
+            pose.leftLeg = 0;
+            pose.rightLeg = 0;
+            pose.bodyY = 0;
+            pose.bodyTilt = 0;
+
+            animator.update({ time, dt, phase, moveBlend, runBlend });
+            applyPose();
+
+            const camTarget = new THREE.Vector3(
+                character.position.x + cameraOffset.x,
+                cameraOffset.y,
+                character.position.z + cameraOffset.z
+            );
+            camera.position.lerp(camTarget, 1 - Math.exp(-12 * dt));
+            camera.lookAt(new THREE.Vector3(character.position.x, 1.0, character.position.z));
+
+            dirLight.position.copy(character.position).add(new THREE.Vector3(20, 30, 20));
+            dirLight.target.position.copy(character.position);
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            const newAspect = window.innerWidth / window.innerHeight;
+            camera.left = -d * newAspect;
+            camera.right = d * newAspect;
+            camera.top = d;
+            camera.bottom = -d;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
